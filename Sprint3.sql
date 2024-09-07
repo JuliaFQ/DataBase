@@ -100,7 +100,7 @@ EXCEPTION
         RAISE_APPLICATION_ERROR(-20003, 'Erro ao converter para JSON: ' || SQLERRM);
 END;
 /
-to_custom_json
+
 --Função que substitui uma procedure já existente
 
 -----------------------------------------------Procedures-------------------------------------------------

@@ -1,7 +1,7 @@
 --Sprint 3
-drop table tb_paciente_auditoria
+
 -----------------------------------------------Gatilho------------------------------------------------
---Criação da tabela de auditoria
+--CriaÃ§Ã£o da tabela de auditoria
 CREATE TABLE TB_PACIENTE_AUDITORIA(
     CPF NUMBER
     ,NOME_COMPLETO VARCHAR2(100)
@@ -16,7 +16,7 @@ CREATE TABLE TB_PACIENTE_AUDITORIA(
     ,DATA_OPERACAO DATE
 )
 
---Triger que vê se ouve algum INSERT, UPDATE ou DELETE na tabela TB_PACIENTE
+--Triger que vÃª se ouve algum INSERT, UPDATE ou DELETE na tabela TB_PACIENTE
 CREATE OR REPLACE TRIGGER TRG_PACIENTE_AUDITORIA
     AFTER INSERT OR UPDATE OR DELETE ON TB_PACIENTE
     FOR EACH ROW
@@ -32,10 +32,10 @@ BEGIN
         OPERACAO := 'DELETE';
     END IF;
 
-    -- Pegar o nome do usuário que fez a operação
+    -- Pegar o nome do usuÃ¡rio que fez a operaÃ§Ã£o
     NOME_USUARIO := SYS_CONTEXT('USERENV', 'SESSION_USER');
     
-    -- Inserir dados na tabela de auditoria para operações de INSERT ou UPDATE
+    -- Inserir dados na tabela de auditoria para operaÃ§Ãµes de INSERT ou UPDATE
     IF INSERTING OR UPDATING THEN
         INSERT INTO TB_PACIENTE_AUDITORIA
             (CPF, NOME_COMPLETO, DATA_NASC, END_PACIENTE, TEL_PACIENTE, 
@@ -45,7 +45,7 @@ BEGIN
              :NEW.EMAIL_PACIENTE, :NEW.SENHA, :NEW.SEXO, NOME_USUARIO, OPERACAO, SYSDATE);
     END IF;
 
-    -- Inserir dados antigos (OLD) na tabela de auditoria para operações de UPDATE ou DELETE
+    -- Inserir dados antigos (OLD) na tabela de auditoria para operaÃ§Ãµes de UPDATE ou DELETE
     IF UPDATING OR DELETING THEN
         INSERT INTO TB_PACIENTE_AUDITORIA
             (CPF, NOME_COMPLETO, DATA_NASC, END_PACIENTE, TEL_PACIENTE, 
@@ -57,9 +57,9 @@ BEGIN
 END;
 /
 
------------------------------------------------Funções------------------------------------------------
+-----------------------------------------------FunÃ§Ãµes------------------------------------------------
 
---Função que tranforma os dados em formato JSON
+--FunÃ§Ã£o que tranforma os dados em formato JSON
 CREATE OR REPLACE FUNCTION CONVERSOR_JSON(
     CHAVE   VARCHAR2,
     VALOR VARCHAR2
@@ -69,17 +69,17 @@ BEGIN
 
     JSON_FINAL := '{ "' || CHAVE || '": ';
 
-    -- Exceção 1: Verificar se o valor é nulo
+    -- ExceÃ§Ã£o 1: Verificar se o valor Ã© nulo
     IF VALOR IS NULL THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Valor nulo não permitido.');
+        RAISE_APPLICATION_ERROR(-20001, 'Valor nulo nÃ£o permitido.');
     END IF;
 
-    -- Exceção 2: Verificar o tamanho do valor
+    -- ExceÃ§Ã£o 2: Verificar o tamanho do valor
     IF LENGTH(VALOR) > 4000 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Valor excede o tamanho máximo permitido.');
+        RAISE_APPLICATION_ERROR(-20002, 'Valor excede o tamanho mÃ¡ximo permitido.');
     END IF;
 
-    -- Exceção 3: Verificar se o valor é um número válido
+    -- ExceÃ§Ã£o 3: Verificar se o valor Ã© um nÃºmero vÃ¡lido
     BEGIN
         DECLARE
             NUMERO NUMBER;
@@ -101,11 +101,11 @@ EXCEPTION
 END;
 /
 to_custom_json
---Função que substitui uma procedure já existente
+--FunÃ§Ã£o que substitui uma procedure jÃ¡ existente
 
 -----------------------------------------------Procedures-------------------------------------------------
 
---Procedure com JOIN de duas tabelas relacionais e exibição dos dados em formato JSON.
+--Procedure com JOIN de duas tabelas relacionais e exibiÃ§Ã£o dos dados em formato JSON.
 CREATE OR REPLACE PROCEDURE PROC_CLINICA_UNIDADE_JSON AS
     CURSOR TABELAS IS
         SELECT cli.CNPJ, cli.NOME_CLINICA, uni.END_UNIDADE, uni.TIPO_EXAME
@@ -133,7 +133,7 @@ BEGIN
         -- Incrementa o contador
         CURRENT_ROW := CURRENT_ROW + 1;
 
-        -- Adiciona uma vírgula para separar os itens, exceto no último item
+        -- Adiciona uma vÃ­rgula para separar os itens, exceto no Ãºltimo item
         IF CURRENT_ROW < TOTAL_COUNT THEN
             JSON_FINAL := JSON_FINAL || ',';
         END IF;
@@ -152,5 +152,5 @@ EXCEPTION
 END;
 /
 
---Procedimento que lê os dados de uma tabela e mostra seus valores anteriores, atuais e próximos.
+--Procedimento que lÃª os dados de uma tabela e mostra seus valores anteriores, atuais e prÃ³ximos.
 

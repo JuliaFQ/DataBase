@@ -1,5 +1,6 @@
 --Sprint 3
 
+set serveroutput on;
 -----------------------------------------------Gatilho------------------------------------------------
 --Criação da tabela de auditoria
 CREATE TABLE TB_PACIENTE_AUDITORIA(
@@ -32,10 +33,8 @@ BEGIN
         OPERACAO := 'DELETE';
     END IF;
 
-    -- Pegar o nome do usuário que fez a operação
     NOME_USUARIO := SYS_CONTEXT('USERENV', 'SESSION_USER');
     
-    -- Inserir dados na tabela de auditoria para operações de INSERT ou UPDATE
     IF INSERTING OR UPDATING THEN
         INSERT INTO TB_PACIENTE_AUDITORIA
             (CPF, NOME_COMPLETO, DATA_NASC, END_PACIENTE, TEL_PACIENTE, 
@@ -45,7 +44,6 @@ BEGIN
              :NEW.EMAIL_PACIENTE, :NEW.SENHA, :NEW.SEXO, NOME_USUARIO, OPERACAO, SYSDATE);
     END IF;
 
-    -- Inserir dados antigos (OLD) na tabela de auditoria para operações de UPDATE ou DELETE
     IF UPDATING OR DELETING THEN
         INSERT INTO TB_PACIENTE_AUDITORIA
             (CPF, NOME_COMPLETO, DATA_NASC, END_PACIENTE, TEL_PACIENTE, 
@@ -57,8 +55,8 @@ BEGIN
 END;
 /
 
------------------------------------------------Funções------------------------------------------------
 
+-----------------------------------------------Funções------------------------------------------------
 --Função que tranforma os dados em formato JSON
 CREATE OR REPLACE FUNCTION CONVERSOR_JSON(
     CHAVE   VARCHAR2,
@@ -69,17 +67,14 @@ BEGIN
 
     JSON_FINAL := '{ "' || CHAVE || '": ';
 
-    -- Exceção 1: Verificar se o valor é nulo
     IF VALOR IS NULL THEN
         RAISE_APPLICATION_ERROR(-20001, 'Valor nulo não permitido.');
     END IF;
 
-    -- Exceção 2: Verificar o tamanho do valor
-    IF LENGTH(VALOR) > 4000 THEN
+    IF LENGTH(VALOR) > 100 THEN
         RAISE_APPLICATION_ERROR(-20002, 'Valor excede o tamanho máximo permitido.');
     END IF;
 
-    -- Exceção 3: Verificar se o valor é um número válido
     BEGIN
         DECLARE
             NUMERO NUMBER;
@@ -102,10 +97,14 @@ END;
 /
 
 --Função que substitui uma procedure já existente
+//Professor, como já comentei com o senhor todas as procedures que fiz até aqui para 
+//nosso projeto eram um CRUD nas tabelas e o que fazia as verificações de cpf
+//válidos ou outros já eram todos funções.
+
 
 -----------------------------------------------Procedures-------------------------------------------------
-
 --Procedure com JOIN de duas tabelas relacionais e exibição dos dados em formato JSON.
+
 CREATE OR REPLACE PROCEDURE PROC_CLINICA_UNIDADE_JSON AS
     CURSOR TABELAS IS
         SELECT cli.CNPJ, cli.NOME_CLINICA, uni.END_UNIDADE, uni.TIPO_EXAME
@@ -116,32 +115,27 @@ CREATE OR REPLACE PROCEDURE PROC_CLINICA_UNIDADE_JSON AS
     TOTAL_COUNT INTEGER;
     CURRENT_ROW INTEGER := 0;
 BEGIN
-    JSON_FINAL := '[';
+    JSON_FINAL := '[' || CHR(10); 
 
-    -- Calcula o total de registros
     SELECT COUNT(*) INTO TOTAL_COUNT FROM TB_CLINICA cli JOIN TB_UNIDADE uni ON cli.CNPJ = uni.CLINICA_CNPJ;
 
-    -- Executa o cursor e processa os dados
     FOR i IN TABELAS LOOP
-        JSON_FINAL := JSON_FINAL || '{' ||
-            CONVERSOR_JSON('CNPJ', i.CNPJ) || ', ' ||
-            CONVERSOR_JSON('NOME_CLINICA', i.NOME_CLINICA) || ', ' ||
-            CONVERSOR_JSON('END_UNIDADE', i.END_UNIDADE) || ', ' ||
-            CONVERSOR_JSON('TIPO_EXAME', i.TIPO_EXAME) ||
+        JSON_FINAL := JSON_FINAL || '{' || CHR(10) ||  
+            '    ' || CONVERSOR_JSON('CNPJ', i.CNPJ) || ',' || CHR(10) || 
+            '    ' || CONVERSOR_JSON('NOME_CLINICA', i.NOME_CLINICA) || ',' || CHR(10) ||
+            '    ' || CONVERSOR_JSON('END_UNIDADE', i.END_UNIDADE) || ',' || CHR(10) ||
+            '    ' || CONVERSOR_JSON('TIPO_EXAME', i.TIPO_EXAME) || CHR(10) ||  
         '}';
 
-        -- Incrementa o contador
         CURRENT_ROW := CURRENT_ROW + 1;
 
-        -- Adiciona uma vírgula para separar os itens, exceto no último item
         IF CURRENT_ROW < TOTAL_COUNT THEN
-            JSON_FINAL := JSON_FINAL || ',';
+            JSON_FINAL := JSON_FINAL || ',' || CHR(10);  
         END IF;
     END LOOP;
 
-    JSON_FINAL := JSON_FINAL || ']';
+    JSON_FINAL := JSON_FINAL || CHR(10) || ']';  
 
-    -- Exibir o resultado JSON
     DBMS_OUTPUT.PUT_LINE(JSON_FINAL);
 
 EXCEPTION
@@ -152,5 +146,65 @@ EXCEPTION
 END;
 /
 
---Procedimento que lê os dados de uma tabela e mostra seus valores anteriores, atuais e próximos.
+
+--Procedimento que lê os dados de uma tabela e mostra seus valores como relatório.
+CREATE OR REPLACE PROCEDURE RELATORIO_CONSULTAS (
+    CURSOR_RETORNO OUT SYS_REFCURSOR)
+AS
+BEGIN
+    OPEN CURSOR_RETORNO FOR
+        SELECT 
+            p.NOME_COMPLETO AS NomePaciente,
+            m.NOME_MED AS NomeMedico,
+            cl.NOME_CLINICA AS Clinica,
+            u.END_UNIDADE AS Endereco,
+            c.DATA_HORA_CONSULTAS AS DataConsulta
+        FROM 
+            TB_AGENDAMENTO a
+        JOIN 
+            TB_PACIENTE p ON a.PACIENTE_CPF = p.CPF
+        JOIN 
+            TB_UNIDADE u ON a.UNIDADE_ID_UNIDADE = u.ID_UNIDADE
+        JOIN 
+            TB_CLINICA cl ON u.CLINICA_CNPJ = cl.CNPJ
+        JOIN 
+            TB_MEDICO m ON a.N_PROTOCOLO = m.AGENDAMENTO_N_PROTOCOLO
+        JOIN 
+            TB_CONSULTAS c ON a.N_PROTOCOLO = c.AGENDAMENTO_N_PROTOCOLO;
+        
+        EXCEPTION
+
+        WHEN INVALID_CURSOR THEN
+            DBMS_OUTPUT.PUT_LINE('Erro: Tentativa de operar com um cursor inválido.');
+    
+        WHEN TOO_MANY_ROWS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro: A consulta retornou mais de uma linha quando apenas uma era esperada.');
+    
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro inesperado: ' || SQLERRM);
+END;
+
+--Para executar a procedure RELATORIO_CONSULTAS já que ela tem um cursor
+DECLARE
+    cur SYS_REFCURSOR;
+    NomePaciente TB_PACIENTE.NOME_COMPLETO%TYPE;
+    NomeMedico TB_MEDICO.NOME_MED%TYPE;
+    Clinica TB_CLINICA.NOME_CLINICA%TYPE;
+    Endereco TB_UNIDADE.END_UNIDADE%TYPE;
+    DataConsulta TB_CONSULTAS.DATA_HORA_CONSULTAS%TYPE;
+BEGIN
+    RELATORIO_CONSULTAS(cur);
+
+    LOOP
+        FETCH cur INTO NomePaciente, NomeMedico, Clinica, Endereco, DataConsulta;
+        EXIT WHEN cur%NOTFOUND;
+
+        DBMS_OUTPUT.PUT_LINE('Paciente: ' || NomePaciente || ', Médico: ' || NomeMedico ||
+                             ', Clínica: ' || Clinica || ', Endereço: ' || Endereco ||
+                             ', Data: ' || DataConsulta);
+        DBMS_OUTPUT.PUT_LINE(CHR(10));
+    END LOOP;
+
+    CLOSE cur;
+END;
 
